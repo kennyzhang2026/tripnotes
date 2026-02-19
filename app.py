@@ -117,13 +117,20 @@ def show_home_page():
         username = get_current_user()
         st.success(f"👋 欢迎，{username}！")
 
-        # 大按钮快速进入
-        if st.button("📝 创建新游记", use_container_width=True, type="primary"):
-            st.switch_page("pages/3_创建游记.py")
+        # 快速操作按钮
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("📝 创建新游记", use_container_width=True, type="primary"):
+                st.switch_page("pages/3_创建游记.py")
+
+        with col2:
+            if st.button("📚 我的游记", use_container_width=True):
+                st.switch_page("pages/4_我的游记.py")
 
         # 查看我的游记
         st.markdown("---")
-        st.markdown("### 📚 我的游记")
+        st.markdown("### 📚 最近游记")
 
         try:
             from clients.user_client import UserClient
@@ -132,9 +139,19 @@ def show_home_page():
 
             if notes:
                 for note in notes[:5]:  # 显示最近5篇
+                    note_id = note.get('note_id', '')
                     with st.expander(f"📖 {note.get('title', '未命名游记')} - {note.get('location', '')}"):
                         st.markdown(f"**日期**: {note.get('travel_date', '未知')}")
-                        st.markdown(f"**游记ID**: {note.get('note_id', '')}")
+                        # 添加查看详情和编辑按钮
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("👁️ 查看", key=f"view_{note_id}"):
+                                st.session_state.view_note_id = note_id
+                                st.switch_page("pages/5_游记详情.py")
+                        with col2:
+                            if st.button("✏️ 编辑", key=f"edit_{note_id}"):
+                                st.session_state.edit_note_id = note_id
+                                st.switch_page("pages/6_编辑游记.py")
             else:
                 st.info("暂无游记，快去创建第一篇吧！")
 
