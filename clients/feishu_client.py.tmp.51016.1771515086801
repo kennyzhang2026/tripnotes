@@ -252,19 +252,8 @@ class FeishuClient:
         """
         url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{self.app_token_note}/tables/{self.table_id_note}/records"
 
-        # 修复 filter 格式
-        filter_condition = {
-            "conjunction": "and",
-            "conditions": [
-                {
-                    "field_name": "username",
-                    "operator": "is",
-                    "value": [username]
-                }
-            ]
-        }
         params = {
-            "filter": json.dumps(filter_condition),
+            "filter": '{"conditions":[{"field_name":"username","operator":"is","value":[%s]}]}' % json.dumps(username),
             "page_size": limit
         }
 

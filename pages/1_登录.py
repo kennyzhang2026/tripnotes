@@ -85,7 +85,7 @@ def show_login_page():
     # 注册链接
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown('<div style="text-align: center;">还没有账号？ <a href="pages/2_注册.py" target="_self">立即注册</a></div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align: center;">还没有账号？</div>', unsafe_allow_html=True)
         if st.button("去注册", use_container_width=True):
             st.switch_page("pages/2_注册.py")
 

@@ -93,7 +93,7 @@ def show_register_page():
     # 登录链接
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown('<div style="text-align: center;">已有账号？ <a href="pages/1_登录.py" target="_self">立即登录</a></div>', unsafe_allow_html=True)
+        st.markdown('<div style="text-align: center;">已有账号？</div>', unsafe_allow_html=True)
         if st.button("去登录", use_container_width=True):
             st.switch_page("pages/1_登录.py")
 
