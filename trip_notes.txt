@@ -1,0 +1,2 @@
+note_id,username,title,location,travel_date,images,ocr_results,user_notes,ai_content,created_at,updated_at
+test001,zhangsan,北京游记,北京,2026-02-10,"[""img1.jpg""]","{""text"":""test""}",很好玩,AI生成的游记内容,2026-02-10 12:00:00,2026-02-10 12:00:00
