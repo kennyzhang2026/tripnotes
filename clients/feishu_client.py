@@ -141,23 +141,17 @@ class FeishuClient:
         """
         url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{self.app_token_user}/tables/{self.table_id_user}/records"
 
-        # 修复 filter 格式 - 使用 textContains 操作符
-        filter_condition = {
-            "conjunction": "and",
-            "conditions": [
-                {
-                    "field_name": "username",
-                    "operator": "is",
-                    "value": [username]
-                }
-            ]
-        }
-        params = {"filter": json.dumps(filter_condition)}
-
-        result = self._request("GET", url, params=params)
+        # 获取所有记录，然后在代码中过滤
+        result = self._request("GET", url, params={"page_size": 100})
         items = result.get("items", [])
 
-        return items[0] if items else None
+        # 在代码中查找匹配的用户名
+        for item in items:
+            fields = item.get("fields", {})
+            if fields.get("username") == username:
+                return item
+
+        return None
 
     def update_user_status(self, record_id: str, status: str) -> dict:
         """
@@ -221,23 +215,17 @@ class FeishuClient:
         """
         url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{self.app_token_note}/tables/{self.table_id_note}/records"
 
-        # 修复 filter 格式
-        filter_condition = {
-            "conjunction": "and",
-            "conditions": [
-                {
-                    "field_name": "note_id",
-                    "operator": "is",
-                    "value": [note_id]
-                }
-            ]
-        }
-        params = {"filter": json.dumps(filter_condition)}
-
-        result = self._request("GET", url, params=params)
+        # 获取所有记录，然后在代码中过滤
+        result = self._request("GET", url, params={"page_size": 100})
         items = result.get("items", [])
 
-        return items[0] if items else None
+        # 在代码中查找匹配的 note_id
+        for item in items:
+            fields = item.get("fields", {})
+            if fields.get("note_id") == note_id:
+                return item
+
+        return None
 
     def list_trip_notes(self, username: str, limit: int = 20) -> List[dict]:
         """
@@ -252,24 +240,20 @@ class FeishuClient:
         """
         url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{self.app_token_note}/tables/{self.table_id_note}/records"
 
-        # 修复 filter 格式
-        filter_condition = {
-            "conjunction": "and",
-            "conditions": [
-                {
-                    "field_name": "username",
-                    "operator": "is",
-                    "value": [username]
-                }
-            ]
-        }
-        params = {
-            "filter": json.dumps(filter_condition),
-            "page_size": limit
-        }
+        # 获取所有记录，然后在代码中过滤
+        result = self._request("GET", url, params={"page_size": 100})
+        all_items = result.get("items", [])
 
-        result = self._request("GET", url, params=params)
-        return result.get("items", [])
+        # 在代码中过滤属于该用户的游记
+        filtered_items = []
+        for item in all_items:
+            fields = item.get("fields", {})
+            if fields.get("username") == username:
+                filtered_items.append(item)
+                if len(filtered_items) >= limit:
+                    break
+
+        return filtered_items
 
     def update_trip_note(self, record_id: str, note_data: dict) -> dict:
         """
