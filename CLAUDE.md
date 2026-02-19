@@ -2,7 +2,7 @@
 
 > 版本: v0.2.0
 > 更新时间: 2026-02-19
-> 状态: 核心功能开发完成
+> 状态: 调试中 - 认证功能测试
 
 ---
 
@@ -194,6 +194,22 @@ feature/v2.0-video       # 视频功能
 
 ## 版本历史
 
+### 当前调试进度 (2026-02-19)
+
+#### 正在处理的问题
+- 🔧 用户登录调试中
+  - 问题：登录返回"用户名或密码错误"
+  - 已添加调试日志到 `auth_client.py` 和 `feishu_client.py`
+  - 需要确认飞书表格配置（AppToken、TableID）
+  - 需要确认用户数据（用户名 `kenny`，密码明文存储，状态为 `active`）
+
+#### 最近修改
+- 🔧 简化认证流程 - 移除密码哈希，改用明文密码
+- 🔧 修复飞书 API filter - 改用客户端过滤
+- 🔧 移除登录/注册页面的无效 HTML 链接
+
+---
+
 ### v0.2.0 (2026-02-19) - Git Tag: `v0.2.0`
 
 #### 游记管理功能
@@ -276,11 +292,54 @@ feature/v2.0-video       # 视频功能
 | OCR 客户端 | ✅ 完成 | 阿里云 OCR 集成 |
 | OSS 客户端 | ✅ 完成 | 阿里云 OSS 图片存储 |
 | ASR 客户端 | ✅ 完成 | 阿里云语音识别 |
-| 飞书客户端 | ✅ 完成 | 多维表格数据管理 |
-| 认证系统 | ✅ 完成 | 注册、登录、会话管理 |
+| 飞书客户端 | 🔧 调试 | API filter 格式已修复 |
+| 认证系统 | 🔧 调试 | 已添加调试日志，测试中 |
 | 工具模块 | ✅ 完成 | 配置、提示词、图片处理 |
 | UI 页面 | ✅ 完成 | 全部 6 个页面完成 |
 | 游记管理 | ✅ 完成 | 列表、详情、编辑、导出 |
+
+### 调试信息
+
+#### 飞书表格配置确认
+请确认以下配置在 `.streamlit/secrets.toml` 中正确设置：
+
+```toml
+# 飞书配置
+FEISHU_APP_ID = "cli_xxx"
+FEISHU_APP_SECRET = "xxx"
+
+# 用户数据表 (trip_note_users)
+FEISHU_APP_TOKEN_USER = "bascnxxxxx"  # 从表格 URL 获取
+FEISHU_TABLE_ID_USER = "tblxxxxx"    # 从表格 URL 获取
+
+# 游记数据表 (trip_notes)
+FEISHU_APP_TOKEN_NOTE = "bascnxxxxx"  # 从表格 URL 获取
+FEISHU_TABLE_ID_NOTE = "tblxxxxx"    # 从表格 URL 获取
+```
+
+#### 用户数据确认
+飞书表格 `trip_note_users` 中应包含：
+- `username`: kenny
+- `password`: 你的密码（明文）
+- `status`: active
+- `role`: user 或 admin
+
+#### 调试检查清单
+1. ☑ 确认飞书表格 `trip_note_users` 存在且有数据
+2. ☑ 确认用户 `kenny` 的 `status` 字段为 `active`
+3. ☑ 确认 `secrets.toml` 中的 AppToken 和 TableID 正确
+4. ☑ 运行应用后在终端查看调试日志
+5. ☑ 根据调试日志判断问题所在
+
+#### 调试日志查看位置
+运行 `streamlit run app.py` 后，调试信息会直接显示在终端中：
+```
+[DEBUG] 尝试登录 - 用户名: kenny
+[DEBUG] 飞书查询 - AppToken: xxx, TableID: xxx
+[DEBUG] 飞书返回记录数: X
+[DEBUG] 检查记录 - username字段: 'xxx', 查找: 'kenny'
+...
+```
 
 ---
 
