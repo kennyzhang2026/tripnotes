@@ -52,33 +52,11 @@ def show_create_note_page():
     st.title("📝 创建游记")
     st.markdown("---")
 
-    # 游记基本信息
-    col1, col2, col3 = st.columns(3)
+    # 游记基本信息（简化版：只需输入地点）
+    location = st.text_input("📍 地点/景区", placeholder="如：西湖风景区")
+    auto_title = st.checkbox("🤖 AI 自动生成标题", value=True)
 
-    with col1:
-        location = st.text_input("📍 地点/景区", placeholder="如：西湖风景区")
-
-    with col2:
-        # 优先使用从照片检测到的日期
-        default_date = None
-        date_help = "请选择旅行日期"
-
-        # 使用 .get() 避免 KeyError
-        detected_date = st.session_state.get("detected_date")
-        if detected_date:
-            try:
-                from datetime import datetime
-                default_date = datetime.strptime(detected_date, '%Y-%m-%d').date()
-                date_help = f"📅 从照片识别到日期: {detected_date}"
-            except:
-                pass
-
-        travel_date = st.date_input("📅 旅行日期", value=default_date, help=date_help)
-
-    with col3:
-        auto_title = st.checkbox("🤖 AI 自动生成标题", value=True)
-
-    # 已添加的照片+评论列表
+    # 已提交的批次列表
     if st.session_state.submitted_batches:
         st.markdown("---")
         st.markdown(f"### 📦 已提交批次 ({len(st.session_state.submitted_batches)})")
@@ -112,13 +90,14 @@ def show_create_note_page():
     with col_photos:
         st.markdown("#### 📷 照片区域")
 
-        # 批量上传照片
+        # 批量上传照片（在移动端会显示相机选项）
         uploaded_files = st.file_uploader(
-            "添加照片（支持多选）",
+            "➕ 添加照片",
             type=["jpg", "jpeg", "png"],
             accept_multiple_files=True,
             key="batch_photo_upload",
-            help="可以一次选择多张照片，或在移动端拍照"
+            help="支持多选照片，移动端可拍照",
+            label_visibility="visible"
         )
 
         # 处理新上传的照片
@@ -150,14 +129,14 @@ def show_create_note_page():
                     if idx < len(st.session_state.current_batch_photos):
                         photo = st.session_state.current_batch_photos[idx]
                         with col:
-                            st.image(photo["image"], use_container_width=True)
+                            st.image(photo["image"], width="content")
                             # 删除按钮
                             if st.button("🗑️ 删除", key=f"del_photo_{idx}"):
                                 removed = st.session_state.current_batch_photos.pop(idx)
                                 print(f"[DEBUG] 删除照片: {removed['filename']}")
                                 st.rerun()
         else:
-            st.info("👆 请添加照片")
+            st.info("👆 点击上方添加照片")
 
     with col_comment:
         st.markdown("#### 📝 我的感想")
@@ -171,45 +150,10 @@ def show_create_note_page():
 • 人物：和家人、和朋友...
 • 感受：风景很美、心情愉快...""",
             key="batch_comment",
-            height=200,
+            height=300,
             label_visibility="collapsed"
         )
         st.session_state.current_batch_comment = comment
-
-        # 语音输入（内嵌在输入区域下方）
-        st.markdown("---")
-        st.markdown("#### 🎤 语音输入")
-
-        audio_file = st.file_uploader(
-            "录制或上传音频",
-            type=["wav", "mp3", "m4a"],
-            key="batch_audio_upload",
-            help="说话会自动转换为文字并填入上方输入框"
-        )
-
-        if audio_file:
-            st.audio(audio_file)
-
-            if st.button("🎵 转换为文字", key="batch_transcribe"):
-                with st.spinner("正在转换..."):
-                    try:
-                        asr_client = ASRClient()
-                        audio_bytes = audio_file.read()
-                        text = asr_client.transcribe_bytes(audio_bytes, format="wav")
-
-                        if text:
-                            st.success(f"✅ 转换成功")
-                            # 将语音转文字追加到输入框
-                            current = st.session_state.current_batch_comment
-                            new_comment = current + (" " if current else "") + text
-                            st.session_state.current_batch_comment = new_comment
-                            st.session_state.batch_comment = new_comment
-                            st.rerun()
-                        else:
-                            st.warning("未能识别到语音")
-                    except Exception as e:
-                        st.error(f"语音转换失败: {str(e)}")
-                        print(f"[DEBUG] 语音转换错误: {e}")
 
     # 提交这批内容按钮
     st.markdown("---")
@@ -258,6 +202,9 @@ def show_create_note_page():
     # 生成游记按钮
     st.markdown("---")
     st.markdown("### 🚀 生成游记")
+
+    # 日期输入（放在生成按钮前）
+    travel_date = st.date_input("📅 旅行日期", value=datetime.now().date())
 
     if st.button("✨ 生成游记", use_container_width=True, type="primary"):
         if not st.session_state.submitted_batches:
