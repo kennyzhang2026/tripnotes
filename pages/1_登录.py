@@ -51,7 +51,10 @@ def show_login_page():
     # 快速登录按钮
     if st.button("🚀 一键登录 (kenny)", use_container_width=True, type="primary"):
         quick_username = "kenny"
-        quick_password = "Kenny123"  # 根据实际密码配置
+        quick_password = "12888211"  # DEBUG: 快速登录密码
+
+        # DEBUG: 输出快速登录信息
+        print(f"[DEBUG] 快速登录 - 用户名: {quick_username}")
 
         with st.spinner("快速登录中..."):
             try:
