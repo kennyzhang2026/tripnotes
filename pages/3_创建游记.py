@@ -145,8 +145,63 @@ def show_create_note_page():
                     st.rerun()
 
         with photo_tab2:
-            # 拍照
-            camera_image = st.camera_input("拍照", key="batch_photo_camera", label_visibility="collapsed")
+            st.markdown("### 📷 拍照")
+
+            # 添加 JavaScript 来强制使用后置摄像头
+            st.markdown("""
+            <script>
+            // 等待页面加载完成
+            document.addEventListener('DOMContentLoaded', function() {
+                // 查找所有文件输入元素
+                const fileInputs = document.querySelectorAll('input[type="file"]');
+
+                fileInputs.forEach(function(input) {
+                    // 为每个文件输入添加 capture="environment" 属性（后置摄像头）
+                    input.setAttribute('capture', 'environment');
+                });
+
+                console.log('已设置后置摄像头优先');
+            });
+            </script>
+            """, unsafe_allow_html=True)
+
+            st.info("📱 **移动端提示**：点击下方按钮会打开相机，可以使用后置摄像头拍照")
+
+            # 方案1: 直接拍照（Streamlit 原生）
+            camera_image = st.camera_input("📸 Streamlit 相机", key="batch_photo_camera", label_visibility="visible")
+
+            # 方案2: 文件上传（移动端会打开相机，现强制使用后置）
+            st.markdown("---")
+            camera_files = st.file_uploader(
+                "📷 打开相机拍照",
+                type=["jpg", "jpeg", "png"],
+                accept_multiple_files=True,
+                key="batch_camera_files",
+                help="移动端会直接打开后置摄像头"
+            )
+
+            # 处理相机文件
+            if camera_files:
+                for camera_file in camera_files:
+                    file_id = f"camera_{camera_file.name}_{camera_file.size}"
+
+                    if file_id not in st.session_state._processed_files:
+                        image = validate_image(camera_file)
+                        if image:
+                            # 提取文件扩展名
+                            ext = camera_file.name.split('.')[-1] if '.' in camera_file.name else 'jpg'
+                            filename = f"camera_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
+                            st.session_state.current_batch_photos.append({
+                                "image": image,
+                                "filename": filename
+                            })
+                            print(f"[DEBUG] 添加相机照片: {filename}")
+                            st.session_state._processed_files.add(file_id)
+
+                if camera_files:
+                    st.rerun()
+
+            # 处理 Streamlit 原生相机
             if camera_image:
                 # 使用时间戳+文件大小作为唯一标识
                 file_id = f"camera_{camera_image.name}_{camera_image.size}"
