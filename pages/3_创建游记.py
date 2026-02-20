@@ -52,10 +52,6 @@ def show_create_note_page():
     st.title("📝 创建游记")
     st.markdown("---")
 
-    # 游记基本信息（简化版：只需输入地点）
-    location = st.text_input("📍 地点/景区", placeholder="如：西湖风景区")
-    auto_title = st.checkbox("🤖 AI 自动生成标题", value=True)
-
     # 已提交的批次列表
     if st.session_state.submitted_batches:
         st.markdown("---")
@@ -150,10 +146,45 @@ def show_create_note_page():
 • 人物：和家人、和朋友...
 • 感受：风景很美、心情愉快...""",
             key="batch_comment",
-            height=300,
+            height=250,
             label_visibility="collapsed"
         )
         st.session_state.current_batch_comment = comment
+
+        # 语音按钮（简洁版）
+        st.markdown("---")
+        audio_file = st.file_uploader(
+            "🎤 语音转文字",
+            type=["wav", "mp3", "m4a"],
+            key="batch_audio_upload",
+            help="上传音频文件自动转换为文字"
+        )
+
+        if audio_file:
+            col_play, col_convert = st.columns([1, 1])
+            with col_play:
+                st.audio(audio_file)
+            with col_convert:
+                if st.button("🎵 转换", key="batch_transcribe", use_container_width=True):
+                    with st.spinner("正在转换..."):
+                        try:
+                            asr_client = ASRClient()
+                            audio_bytes = audio_file.read()
+                            text = asr_client.transcribe_bytes(audio_bytes, format="wav")
+
+                            if text:
+                                st.success(f"✅ 转换成功")
+                                # 将语音转文字追加到输入框
+                                current = st.session_state.current_batch_comment
+                                new_comment = current + (" " if current else "") + text
+                                st.session_state.current_batch_comment = new_comment
+                                st.session_state.batch_comment = new_comment
+                                st.rerun()
+                            else:
+                                st.warning("未能识别到语音")
+                        except Exception as e:
+                            st.error(f"语音转换失败: {str(e)}")
+                            print(f"[DEBUG] 语音转换错误: {e}")
 
     # 提交这批内容按钮
     st.markdown("---")
@@ -201,21 +232,17 @@ def show_create_note_page():
 
     # 生成游记按钮
     st.markdown("---")
-    st.markdown("### 🚀 生成游记")
-
-    # 日期输入（放在生成按钮前）
-    travel_date = st.date_input("📅 旅行日期", value=datetime.now().date())
-
     if st.button("✨ 生成游记", use_container_width=True, type="primary"):
         if not st.session_state.submitted_batches:
             st.warning("请先至少提交一批内容")
             return
 
-        if not location:
-            st.error("请填写地点/景区")
-            return
+        # 使用默认值
+        location = "未命名地点"
+        travel_date = str(datetime.now().date())
+        auto_title = True
 
-        generate_trip_note(username, location, str(travel_date), auto_title)
+        generate_trip_note(username, location, travel_date, auto_title)
 
 
 def generate_trip_note(username: str, location: str, travel_date: str, auto_title: bool):
