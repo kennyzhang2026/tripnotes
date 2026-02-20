@@ -61,13 +61,15 @@ def show_create_note_page():
     with col2:
         # 优先使用从照片检测到的日期
         default_date = None
-        date_help = "请选择旅行日期（上传照片后会尝试自动识别）"
+        date_help = "请选择旅行日期"
 
-        if st.session_state.detected_date:
+        # 使用 .get() 避免 KeyError
+        detected_date = st.session_state.get("detected_date")
+        if detected_date:
             try:
                 from datetime import datetime
-                default_date = datetime.strptime(st.session_state.detected_date, '%Y-%m-%d').date()
-                date_help = f"📅 从照片识别到日期: {st.session_state.detected_date}"
+                default_date = datetime.strptime(detected_date, '%Y-%m-%d').date()
+                date_help = f"📅 从照片识别到日期: {detected_date}"
             except:
                 pass
 
@@ -258,8 +260,8 @@ def show_create_note_page():
     st.markdown("### 🚀 生成游记")
 
     if st.button("✨ 生成游记", use_container_width=True, type="primary"):
-        if not st.session_state.photo_entries:
-            st.warning("请先至少添加一张照片")
+        if not st.session_state.submitted_batches:
+            st.warning("请先至少提交一批内容")
             return
 
         if not location:
