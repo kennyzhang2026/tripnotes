@@ -86,17 +86,35 @@ def show_create_note_page():
     with col_photos:
         st.markdown("#### 📷 照片区域")
 
+        # 隐藏 file_uploader 默认 UI
+        st.markdown("""
+        <style>
+        /* 隐藏 file_uploader 的默认界面 */
+        div[data-testid="stFileUploader"] {
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+        }
+        div[data-testid="stFileUploader"] > label {
+            display: none !important;
+        }
+        div[data-testid="stFileUploader"] div[data-testid="stoCloudUploadIcon"] {
+            display: none !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         # 照片添加选项卡
         photo_tab1, photo_tab2 = st.tabs(["📁 照片", "📷 拍照"])
 
         with photo_tab1:
-            # 从文件选择（简洁版）
+            # 从文件选择（隐藏UI）
             uploaded_files = st.file_uploader(
-                "",
+                "点击选择照片",
                 type=["jpg", "jpeg", "png"],
                 accept_multiple_files=True,
                 key="batch_photo_upload_files",
-                label_visibility="collapsed"
+                label_visibility="visible"
             )
 
             if uploaded_files:
@@ -162,48 +180,10 @@ def show_create_note_page():
 • 人物：和家人、和朋友...
 • 感受：风景很美、心情愉快...""",
             key="batch_comment",
-            height=300,
+            height=350,
             label_visibility="collapsed"
         )
         st.session_state.current_batch_comment = comment
-
-        # 语音输入按钮（使用浏览器语音识别）
-        st.markdown("---")
-
-        # 使用 HTML 实现语音输入按钮
-        st.markdown("""
-        <style>
-        .voice-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s;
-        }
-        .voice-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-        .voice-button.recording {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # 使用 Streamlit 的原生按钮，通过 JS 调用语音识别
-        if st.button("🎤 按住说话", key="voice_input_btn", use_container_width=True):
-            st.info("📢 正在录音...请说话（暂未实现，请使用文本输入）")
 
     # 提交这批内容按钮
     st.markdown("---")
