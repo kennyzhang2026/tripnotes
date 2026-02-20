@@ -163,15 +163,15 @@ def show_my_notes_page():
                    search.lower() in n.get("location", "").lower()
             ]
 
-        # 排序
+        # 排序（处理 None 值）
         if sort_by == "创建时间降序":
-            notes.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+            notes.sort(key=lambda x: (x.get("created_at") or 0), reverse=True)
         elif sort_by == "创建时间升序":
-            notes.sort(key=lambda x: x.get("created_at", 0))
+            notes.sort(key=lambda x: (x.get("created_at") or 0))
         elif sort_by == "旅行日期降序":
-            notes.sort(key=lambda x: x.get("travel_date", ""), reverse=True)
+            notes.sort(key=lambda x: (x.get("travel_date") or 0), reverse=True)
         elif sort_by == "旅行日期升序":
-            notes.sort(key=lambda x: x.get("travel_date", ""))
+            notes.sort(key=lambda x: (x.get("travel_date") or 0))
 
         # 显示游记
         if notes:
