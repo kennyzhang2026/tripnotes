@@ -23,11 +23,19 @@ st.set_page_config(
     layout="wide"
 )
 
-# 初始化 session state
-if "photo_entries" not in st.session_state:
-    st.session_state.photo_entries = []
-if "current_entry_id" not in st.session_state:
-    st.session_state.current_entry_id = None
+# 初始化 session state (v0.3.0 重构)
+# current_batch_photos: 当前批次的照片列表
+# current_batch_comment: 当前批次的评论
+# submitted_batches: 已提交的批次列表
+if "current_batch_photos" not in st.session_state:
+    st.session_state.current_batch_photos = []
+if "current_batch_comment" not in st.session_state:
+    st.session_state.current_batch_comment = ""
+if "submitted_batches" not in st.session_state:
+    st.session_state.submitted_batches = []
+
+# DEBUG: 打印初始状态
+print(f"[DEBUG] 初始化 session_state - batches: {len(st.session_state.submitted_batches)}")
 
 
 def require_auth():
@@ -51,99 +59,136 @@ def show_create_note_page():
         location = st.text_input("📍 地点/景区", placeholder="如：西湖风景区")
 
     with col2:
-        travel_date = st.date_input("📅 旅行日期", datetime.now().date())
+        # 优先使用从照片检测到的日期
+        default_date = None
+        date_help = "请选择旅行日期（上传照片后会尝试自动识别）"
+
+        if st.session_state.detected_date:
+            try:
+                from datetime import datetime
+                default_date = datetime.strptime(st.session_state.detected_date, '%Y-%m-%d').date()
+                date_help = f"📅 从照片识别到日期: {st.session_state.detected_date}"
+            except:
+                pass
+
+        travel_date = st.date_input("📅 旅行日期", value=default_date, help=date_help)
 
     with col3:
         auto_title = st.checkbox("🤖 AI 自动生成标题", value=True)
 
     # 已添加的照片+评论列表
-    if st.session_state.photo_entries:
+    if st.session_state.submitted_batches:
         st.markdown("---")
-        st.markdown("### 📸 已添加的照片")
+        st.markdown(f"### 📦 已提交批次 ({len(st.session_state.submitted_batches)})")
 
-        for i, entry in enumerate(st.session_state.photo_entries):
-            with st.expander(f"照片 {i + 1}: {entry.get('note', '无备注')}"):
-                col_img, col_info = st.columns([1, 2])
+        for i, batch in enumerate(st.session_state.submitted_batches):
+            with st.expander(f"批次 {i + 1}: {len(batch['image_urls'])} 张照片 - {batch.get('comment', '无评论')[:30]}..."):
+                # 显示照片网格
+                cols = st.columns(min(4, len(batch["image_urls"])))
+                for j, col in enumerate(cols):
+                    if j < len(batch["image_urls"]):
+                        with col:
+                            st.image(batch["image_urls"][j], use_container_width=True)
 
-                with col_img:
-                    if entry.get("image"):
-                        st.image(entry["image"], width=400)
+                # 显示评论
+                if batch.get("comment"):
+                    st.markdown(f"**💬 评论**: {batch['comment']}")
 
-                with col_info:
-                    st.markdown(f"**用户备注**: {entry.get('note', '无')}")
-                    if entry.get("ocr_text"):
-                        st.markdown(f"**OCR识别**: {entry['ocr_text']}")
-                    if entry.get("voice_text"):
-                        st.markdown(f"**语音内容**: {entry['voice_text']}")
-
-                if st.button(f"删除", key=f"delete_{i}"):
-                    st.session_state.photo_entries.pop(i)
+                # 删除批次按钮
+                if st.button("🗑️ 删除此批次", key=f"del_batch_{i}"):
+                    removed = st.session_state.submitted_batches.pop(i)
+                    print(f"[DEBUG] 删除批次: {removed['batch_id']}")
                     st.rerun()
 
-    # 添加新照片区域
+    # ==================== v0.3.0 批次输入区域 ====================
     st.markdown("---")
-    st.markdown("### ➕ 添加新照片")
+    st.markdown("### 📸 批次内容")
 
-    # 只在第一次或需要新的 entry_id 时生成
-    if st.session_state.current_entry_id is None:
-        st.session_state.current_entry_id = str(uuid.uuid4())
-    entry_id = st.session_state.current_entry_id
+    # 创建两列布局：左侧照片，右侧评论
+    col_photos, col_comment = st.columns([1, 1])
 
-    # 创建两列布局
-    col_upload, col_note = st.columns([1, 1])
+    with col_photos:
+        st.markdown("#### 📷 照片区域")
 
-    with col_upload:
-        st.markdown("#### 📷 上传照片")
-        uploaded_file = st.file_uploader(
-            "选择照片",
+        # 批量上传照片
+        uploaded_files = st.file_uploader(
+            "添加照片（支持多选）",
             type=["jpg", "jpeg", "png"],
-            key=f"upload_{entry_id}"
+            accept_multiple_files=True,
+            key="batch_photo_upload",
+            help="可以一次选择多张照片，或在移动端拍照"
         )
 
-        if uploaded_file:
-            image = validate_image(uploaded_file)
-            if image:
-                st.image(image, width=400)
-                st.session_state[f"temp_image_{entry_id}"] = image
+        # 处理新上传的照片
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                # 检查是否已添加（通过文件名判断）
+                is_duplicate = any(
+                    p.get("filename") == uploaded_file.name
+                    for p in st.session_state.current_batch_photos
+                )
+                if not is_duplicate:
+                    image = validate_image(uploaded_file)
+                    if image:
+                        st.session_state.current_batch_photos.append({
+                            "image": image,
+                            "filename": uploaded_file.name
+                        })
+                        print(f"[DEBUG] 添加照片: {uploaded_file.name}")
 
-                # OCR 识别按钮
-                if st.button(f"🔍 OCR 识别", key=f"ocr_{entry_id}"):
-                    with st.spinner("正在识别文字..."):
-                        try:
-                            ocr_client = OCRClient()
-                            img_bytes = compress_image(image)
-                            ocr_text = ocr_client.extract_text_from_image(img_bytes)
+        # 显示已添加的照片网格
+        if st.session_state.current_batch_photos:
+            st.markdown(f"**已添加 {len(st.session_state.current_batch_photos)} 张照片**")
 
-                            if ocr_text:
-                                st.success(f"识别成功：{ocr_text[:50]}...")
-                                st.session_state[f"temp_ocr_{entry_id}"] = ocr_text
-                            else:
-                                st.info("未识别到文字")
-                        except Exception as e:
-                            st.error(f"OCR 识别失败: {str(e)}")
+            # 网格布局显示照片（每行3张）
+            for i in range(0, len(st.session_state.current_batch_photos), 3):
+                cols = st.columns(3)
+                for j, col in enumerate(cols):
+                    idx = i + j
+                    if idx < len(st.session_state.current_batch_photos):
+                        photo = st.session_state.current_batch_photos[idx]
+                        with col:
+                            st.image(photo["image"], use_container_width=True)
+                            # 删除按钮
+                            if st.button("🗑️ 删除", key=f"del_photo_{idx}"):
+                                removed = st.session_state.current_batch_photos.pop(idx)
+                                print(f"[DEBUG] 删除照片: {removed['filename']}")
+                                st.rerun()
+        else:
+            st.info("👆 请添加照片")
 
-    with col_note:
-        st.markdown("#### 📝 添加备注")
+    with col_comment:
+        st.markdown("#### 📝 我的感想")
 
-        user_note = st.text_area(
-            "文字备注",
-            placeholder="记录你的感想...",
-            key=f"note_{entry_id}",
-            height=100
+        # 评论输入区域（整合时间、地点提示）
+        comment = st.text_area(
+            "在这里记录你的旅行感受...",
+            placeholder="""提示：可以包含以下信息
+• 时间：今天下午、傍晚时分...
+• 地点：西湖边、断桥上、雷峰塔下...
+• 人物：和家人、和朋友...
+• 感受：风景很美、心情愉快...""",
+            key="batch_comment",
+            height=200,
+            label_visibility="collapsed"
         )
+        st.session_state.current_batch_comment = comment
 
-        # 语音输入
+        # 语音输入（内嵌在输入区域下方）
+        st.markdown("---")
         st.markdown("#### 🎤 语音输入")
+
         audio_file = st.file_uploader(
             "录制或上传音频",
             type=["wav", "mp3", "m4a"],
-            key=f"audio_{entry_id}"
+            key="batch_audio_upload",
+            help="说话会自动转换为文字并填入上方输入框"
         )
 
         if audio_file:
             st.audio(audio_file)
 
-            if st.button(f"🎵 转换为文字", key=f"transcribe_{entry_id}"):
+            if st.button("🎵 转换为文字", key="batch_transcribe"):
                 with st.spinner("正在转换..."):
                     try:
                         asr_client = ASRClient()
@@ -151,37 +196,62 @@ def show_create_note_page():
                         text = asr_client.transcribe_bytes(audio_bytes, format="wav")
 
                         if text:
-                            st.success(f"转换成功：{text}")
-                            st.session_state[f"temp_voice_{entry_id}"] = text
+                            st.success(f"✅ 转换成功")
+                            # 将语音转文字追加到输入框
+                            current = st.session_state.current_batch_comment
+                            new_comment = current + (" " if current else "") + text
+                            st.session_state.current_batch_comment = new_comment
+                            st.session_state.batch_comment = new_comment
+                            st.rerun()
                         else:
                             st.warning("未能识别到语音")
                     except Exception as e:
                         st.error(f"语音转换失败: {str(e)}")
+                        print(f"[DEBUG] 语音转换错误: {e}")
 
-    # 添加到列表按钮
-    if st.button(f"➕ 添加此照片", use_container_width=True, type="primary"):
-        if f"temp_image_{entry_id}" in st.session_state:
-            entry = {
-                "id": entry_id,
-                "image": st.session_state[f"temp_image_{entry_id}"],
-                "note": user_note,
-                "ocr_text": st.session_state.get(f"temp_ocr_{entry_id}", ""),
-                "voice_text": st.session_state.get(f"temp_voice_{entry_id}", "")
-            }
-            st.session_state.photo_entries.append(entry)
+    # 提交这批内容按钮
+    st.markdown("---")
+    if st.button("📤 提交这批内容", use_container_width=True, type="primary"):
+        if not st.session_state.current_batch_photos:
+            st.warning("请先添加照片")
+            return
 
-            # 清理临时数据
-            for key in list(st.session_state.keys()):
-                if key.startswith(f"temp_{entry_id}"):
-                    del st.session_state[key]
+        # 提交批次
+        with st.spinner("正在提交批次..."):
+            try:
+                # 上传照片到 OSS
+                image_client = ImageClient()
+                batch_id = str(uuid.uuid4())
+                image_urls = []
 
-            # 重置 entry_id，以便下次添加新照片
-            st.session_state.current_entry_id = None
+                for i, photo in enumerate(st.session_state.current_batch_photos):
+                    img_bytes = compress_image(photo["image"])
+                    filename = f"batch_{batch_id}_photo_{i+1}.jpg"
+                    url = image_client.upload_image(img_bytes, username, batch_id, filename)
+                    image_urls.append(url)
 
-            st.success("已添加！继续添加或点击生成游记")
-            st.rerun()
-        else:
-            st.warning("请先上传照片")
+                # 创建批次记录
+                batch = {
+                    "batch_id": batch_id,
+                    "image_urls": image_urls,
+                    "comment": st.session_state.current_batch_comment,
+                    "timestamp": datetime.now().isoformat()
+                }
+
+                st.session_state.submitted_batches.append(batch)
+                print(f"[DEBUG] 提交批次 {batch_id}: {len(image_urls)} 张照片")
+
+                # 清空当前批次
+                st.session_state.current_batch_photos = []
+                st.session_state.current_batch_comment = ""
+                st.session_state.batch_comment = ""
+
+                st.success(f"✅ 已提交批次 {len(st.session_state.submitted_batches)}！继续添加或生成游记")
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"提交失败: {str(e)}")
+                print(f"[DEBUG] 提交批次错误: {e}")
 
     # 生成游记按钮
     st.markdown("---")
@@ -200,7 +270,7 @@ def show_create_note_page():
 
 
 def generate_trip_note(username: str, location: str, travel_date: str, auto_title: bool):
-    """生成游记"""
+    """生成游记 - 为每张照片单独生成描述"""
     with st.spinner("正在生成游记..."):
         try:
             # 初始化客户端
@@ -212,10 +282,8 @@ def generate_trip_note(username: str, location: str, travel_date: str, auto_titl
             # 生成游记 ID
             note_id = str(uuid.uuid4())
 
-            # 上传图片并收集 OCR 结果
-            image_urls = []
-            all_ocr_results = {}
-            all_user_notes = []
+            # 存储每张照片的数据
+            photo_data_list = []
 
             with st.expander("处理进度", expanded=True):
                 for i, entry in enumerate(st.session_state.photo_entries):
@@ -225,48 +293,57 @@ def generate_trip_note(username: str, location: str, travel_date: str, auto_titl
                     img_bytes = compress_image(entry["image"])
                     filename = f"photo_{i + 1}.jpg"
                     url = image_client.upload_image(img_bytes, username, note_id, filename)
-                    image_urls.append(url)
 
-                    # OCR 识别
+                    # OCR 识别（如果之前没有识别）
                     ocr_text = entry.get("ocr_text", "")
                     if not ocr_text:
                         try:
                             ocr_text = ocr_client.extract_text_from_image(img_bytes)
                         except:
-                            pass
+                            ocr_text = ""
 
-                    if ocr_text:
-                        all_ocr_results[f"photo_{i + 1}"] = ocr_text
+                    # 获取用户备注（文字 + 语音）
+                    user_note = entry.get("note", "")
+                    voice_text = entry.get("voice_text", "")
+                    combined_note = user_note
+                    if voice_text:
+                        if combined_note:
+                            combined_note += " " + voice_text
+                        else:
+                            combined_note = voice_text
 
-                    # 收集用户备注
-                    if entry.get("note"):
-                        all_user_notes.append(f"照片{i + 1}: {entry['note']}")
-                    if entry.get("voice_text"):
-                        all_user_notes.append(f"语音{i + 1}: {entry['voice_text']}")
+                    # AI 生成描述
+                    ai_desc = ai_client.generate_photo_desc(location, combined_note, ocr_text)
+
+                    photo_data_list.append({
+                        "image_url": url,
+                        "user_note": combined_note,
+                        "ocr_text": ocr_text,
+                        "ai_desc": ai_desc
+                    })
 
                     st.progress((i + 1) / len(st.session_state.photo_entries))
 
-                st.markdown("📝 正在生成游记内容...")
-
-            # 构建上下文
-            images_context = f"共{len(image_urls)}张照片，记录了{location}的风景"
-            user_notes = "\n".join(all_user_notes) if all_user_notes else "用户暂无备注"
-            ocr_context = "\n".join([f"{k}: {v}" for k, v in all_ocr_results.items()]) if all_ocr_results else ""
-
-            # 生成游记内容
-            ai_content = ai_client.generate_trip_note(
-                location=location,
-                travel_date=travel_date,
-                images_context=images_context,
-                user_notes=user_notes,
-                ocr_context=ocr_context
-            )
+                st.markdown("📝 正在生成标题...")
 
             # 生成标题
             if auto_title:
-                title = ai_client.generate_title(location, travel_date, images_context)
+                title = ai_client.generate_title(location, travel_date, len(photo_data_list))
             else:
                 title = f"{location}游记"
+
+            # 构建游记内容（Markdown 格式：照片+描述交替）
+            ai_content_parts = []
+            for i, data in enumerate(photo_data_list):
+                ai_content_parts.append(f"## 照片 {i + 1}\n\n{data['ai_desc']}")
+
+            ai_content = "\n\n".join(ai_content_parts)
+
+            # 准备保存数据
+            image_urls = [d["image_url"] for d in photo_data_list]
+            ocr_results = {f"photo_{i+1}": d["ocr_text"] for i, d in enumerate(photo_data_list) if d["ocr_text"]}
+            user_notes = [d["user_note"] for d in photo_data_list if d["user_note"]]
+            user_notes_str = "\n".join([f"照片{i+1}: {note}" for i, note in enumerate(user_notes)])
 
             # 保存到飞书
             success, message, _ = user_client.create_note(
@@ -275,8 +352,8 @@ def generate_trip_note(username: str, location: str, travel_date: str, auto_titl
                 location=location,
                 travel_date=travel_date,
                 images=image_urls,
-                ocr_results=all_ocr_results,
-                user_notes=user_notes,
+                ocr_results=ocr_results,
+                user_notes=user_notes_str,
                 ai_content=ai_content
             )
 
@@ -288,21 +365,19 @@ def generate_trip_note(username: str, location: str, travel_date: str, auto_titl
                 st.markdown("### 📖 生成的游记")
 
                 st.markdown(f"# {title}")
-                st.markdown(f"**地点**: {location}")
-                st.markdown(f"**日期**: {travel_date}")
-
+                st.markdown(f"**地点**: {location}  |  **日期**: {travel_date}")
                 st.markdown("---")
-                st.markdown(ai_content)
 
-                # 显示图片
-                if image_urls:
+                # 每张照片配描述展示
+                for i, data in enumerate(photo_data_list):
+                    st.markdown(f"### 📷 照片 {i + 1}")
+                    st.image(data["image_url"], width=700)
+                    st.markdown(data["ai_desc"])
                     st.markdown("---")
-                    st.markdown("### 📷 照片集")
-                    for url in image_urls:
-                        st.image(url, width=600)
 
                 # 清空临时数据
                 st.session_state.photo_entries = []
+                st.session_state.detected_date = None
 
                 if st.button("🏠 返回首页", use_container_width=True):
                     st.switch_page("app.py")
