@@ -44,6 +44,32 @@ def show_login_page():
             st.switch_page("app.py")
         return
 
+    # 快速登录区域
+    st.markdown("---")
+    st.markdown("### ⚡ 快速登录")
+
+    # 快速登录按钮
+    if st.button("🚀 一键登录 (kenny)", use_container_width=True, type="primary"):
+        quick_username = "kenny"
+        quick_password = "Kenny123"  # 根据实际密码配置
+
+        with st.spinner("快速登录中..."):
+            try:
+                auth_client = AuthClient()
+                success, message = auth_client.login(quick_username, quick_password)
+
+                if success:
+                    set_logged_in(quick_username)
+                    st.success("快速登录成功！正在跳转...")
+                    st.switch_page("pages/3_创建游记.py")
+                else:
+                    st.error(f"快速登录失败: {message}")
+            except Exception as e:
+                st.error(f"快速登录失败: {str(e)}")
+
+    st.markdown("---")
+    st.markdown("### 👤 普通登录")
+
     # 登录表单
     with st.form("login_form"):
         username = st.text_input(
