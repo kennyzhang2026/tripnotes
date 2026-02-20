@@ -135,7 +135,7 @@ def show_edit_page():
                 col1, col2, col3 = st.columns([1, 3, 1])
 
                 with col1:
-                    st.image(img_url, use_column_width=True)
+                    st.image(img_url, width="content")
 
                 with col2:
                     st.markdown(f"照片 {i + 1}")
@@ -167,7 +167,7 @@ def show_edit_page():
                 col1, col2 = st.columns([1, 1])
 
                 with col1:
-                    st.image(image, use_column_width=True)
+                    st.image(image, width="content")
 
                 with col2:
                     photo_note = st.text_area("照片备注", key=f"new_photo_note")

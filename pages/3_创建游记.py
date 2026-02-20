@@ -64,7 +64,7 @@ def show_create_note_page():
                 for j, col in enumerate(cols):
                     if j < len(batch["image_urls"]):
                         with col:
-                            st.image(batch["image_urls"][j], use_container_width=True)
+                            st.image(batch["image_urls"][j], width="stretch")
 
                 # 显示评论
                 if batch.get("comment"):
@@ -146,7 +146,7 @@ def show_create_note_page():
 
         with photo_tab2:
             # 拍照
-            camera_image = st.camera_input("", key="batch_photo_camera", label_visibility="collapsed")
+            camera_image = st.camera_input("拍照", key="batch_photo_camera", label_visibility="collapsed")
             if camera_image:
                 # 使用时间戳+文件大小作为唯一标识
                 file_id = f"camera_{camera_image.name}_{camera_image.size}"
@@ -264,80 +264,75 @@ def show_create_note_page():
 
 
 def generate_trip_note(username: str, location: str, travel_date: str, auto_title: bool):
-    """生成游记 - 为每张照片单独生成描述"""
+    """生成游记 - v0.3.0 批次模式"""
     with st.spinner("正在生成游记..."):
         try:
             # 初始化客户端
             ai_client = AIClient()
             ocr_client = OCRClient()
-            image_client = ImageClient()
             user_client = UserClient()
 
             # 生成游记 ID
             note_id = str(uuid.uuid4())
 
-            # 存储每张照片的数据
-            photo_data_list = []
+            # 收集所有照片信息（从已提交的批次中）
+            all_image_urls = []
+            all_comments = []
+            ocr_results = {}
 
             with st.expander("处理进度", expanded=True):
-                for i, entry in enumerate(st.session_state.photo_entries):
-                    st.markdown(f"处理照片 {i + 1}/{len(st.session_state.photo_entries)}...")
+                total_photos = sum(len(batch.get("image_urls", [])) for batch in st.session_state.submitted_batches)
+                processed = 0
 
-                    # 压缩并上传图片
-                    img_bytes = compress_image(entry["image"])
-                    filename = f"photo_{i + 1}.jpg"
-                    url = image_client.upload_image(img_bytes, username, note_id, filename)
+                for i, batch in enumerate(st.session_state.submitted_batches):
+                    st.markdown(f"处理批次 {i + 1}/{len(st.session_state.submitted_batches)}...")
 
-                    # OCR 识别（如果之前没有识别）
-                    ocr_text = entry.get("ocr_text", "")
-                    if not ocr_text:
+                    # 收集照片 URL 和评论
+                    image_urls = batch.get("image_urls", [])
+                    comment = batch.get("comment", "")
+
+                    all_image_urls.extend(image_urls)
+                    if comment:
+                        all_comments.append(f"批次{i+1}: {comment}")
+
+                    # OCR 识别（下载图片进行识别）
+                    for j, url in enumerate(image_urls):
                         try:
-                            ocr_text = ocr_client.extract_text_from_image(img_bytes)
-                        except:
-                            ocr_text = ""
+                            # 尝试从 URL 下载图片进行 OCR
+                            import requests
+                            from io import BytesIO
 
-                    # 获取用户备注（文字 + 语音）
-                    user_note = entry.get("note", "")
-                    voice_text = entry.get("voice_text", "")
-                    combined_note = user_note
-                    if voice_text:
-                        if combined_note:
-                            combined_note += " " + voice_text
-                        else:
-                            combined_note = voice_text
+                            response = requests.get(url, timeout=10)
+                            if response.status_code == 200:
+                                img_bytes = response.content
+                                ocr_text = ocr_client.extract_text_from_image(img_bytes)
+                                if ocr_text:
+                                    ocr_results[f"batch{i+1}_photo{j+1}"] = ocr_text
+                        except Exception as e:
+                            print(f"[DEBUG] OCR 识别失败: {e}")
 
-                    # AI 生成描述
-                    ai_desc = ai_client.generate_photo_desc(location, combined_note, ocr_text)
+                    processed += len(image_urls)
+                    st.progress(processed / total_photos)
 
-                    photo_data_list.append({
-                        "image_url": url,
-                        "user_note": combined_note,
-                        "ocr_text": ocr_text,
-                        "ai_desc": ai_desc
-                    })
+                st.markdown("📝 正在生成游记...")
 
-                    st.progress((i + 1) / len(st.session_state.photo_entries))
+            # 使用整体游记生成方法
+            ai_content = ai_client.generate_trip_note(
+                location=location,
+                travel_date=travel_date,
+                batches=st.session_state.submitted_batches,
+                ocr_results=ocr_results if ocr_results else None
+            )
 
-                st.markdown("📝 正在生成标题...")
-
-            # 生成标题
-            if auto_title:
-                title = ai_client.generate_title(location, travel_date, len(photo_data_list))
-            else:
-                title = f"{location}游记"
-
-            # 构建游记内容（Markdown 格式：照片+描述交替）
-            ai_content_parts = []
-            for i, data in enumerate(photo_data_list):
-                ai_content_parts.append(f"## 照片 {i + 1}\n\n{data['ai_desc']}")
-
-            ai_content = "\n\n".join(ai_content_parts)
+            # 提取标题（AI 生成的内容第一行通常是标题）
+            title = ai_content.split("\n")[0].strip("#").strip()
+            if not title or auto_title:
+                # 如果 AI 没有生成标题或需要自动生成，使用专门的标题生成
+                title = ai_client.generate_title(location, travel_date, len(all_image_urls))
 
             # 准备保存数据
-            image_urls = [d["image_url"] for d in photo_data_list]
-            ocr_results = {f"photo_{i+1}": d["ocr_text"] for i, d in enumerate(photo_data_list) if d["ocr_text"]}
-            user_notes = [d["user_note"] for d in photo_data_list if d["user_note"]]
-            user_notes_str = "\n".join([f"照片{i+1}: {note}" for i, note in enumerate(user_notes)])
+            user_notes_str = "\n".join(all_comments) if all_comments else ""
+            ocr_results_str = ocr_results if ocr_results else {}
 
             # 保存到飞书
             success, message, _ = user_client.create_note(
@@ -345,8 +340,8 @@ def generate_trip_note(username: str, location: str, travel_date: str, auto_titl
                 title=title,
                 location=location,
                 travel_date=travel_date,
-                images=image_urls,
-                ocr_results=ocr_results,
+                images=all_image_urls,
+                ocr_results=ocr_results_str,
                 user_notes=user_notes_str,
                 ai_content=ai_content
             )
@@ -358,20 +353,28 @@ def generate_trip_note(username: str, location: str, travel_date: str, auto_titl
                 st.markdown("---")
                 st.markdown("### 📖 生成的游记")
 
-                st.markdown(f"# {title}")
-                st.markdown(f"**地点**: {location}  |  **日期**: {travel_date}")
-                st.markdown("---")
+                # 添加 CSS 样式控制游记中的图片大小
+                st.markdown("""
+                <style>
+                /* 游记内容中的图片样式 */
+                .stMarkdown img {
+                    max-width: 600px;
+                    width: 100%;
+                    height: auto;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    margin: 16px 0;
+                }
+                </style>
+                """, unsafe_allow_html=True)
 
-                # 每张照片配描述展示
-                for i, data in enumerate(photo_data_list):
-                    st.markdown(f"### 📷 照片 {i + 1}")
-                    st.image(data["image_url"], width=700)
-                    st.markdown(data["ai_desc"])
-                    st.markdown("---")
+                # 使用 Markdown 渲染 AI 生成的内容
+                st.markdown(ai_content)
 
                 # 清空临时数据
-                st.session_state.photo_entries = []
-                st.session_state.detected_date = None
+                st.session_state.submitted_batches = []
+                st.session_state.current_batch_photos = []
+                st.session_state.current_batch_comment = ""
 
                 if st.button("🏠 返回首页", use_container_width=True):
                     st.switch_page("app.py")

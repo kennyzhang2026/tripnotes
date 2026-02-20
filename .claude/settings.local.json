@@ -6,7 +6,9 @@
       "Bash(git tag:*)",
       "Bash(git push:*)",
       "Bash(git commit:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(python test_ocr.py:*)",
+      "Bash(python:*)"
     ]
   }
 }

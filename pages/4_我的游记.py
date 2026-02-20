@@ -39,9 +39,9 @@ def show_note_card(note, index):
         # 显示第一张图片
         images = note.get("images", [])
         if images and len(images) > 0:
-            st.image(images[0], use_column_width=True)
+            st.image(images[0], width="content")
         else:
-            st.image("https://via.placeholder.com/300x200?text=无图片", use_column_width=True)
+            st.image("https://via.placeholder.com/300x200?text=无图片", width="content")
 
     with col2:
         # 标题和操作按钮

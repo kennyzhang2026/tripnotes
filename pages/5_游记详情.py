@@ -82,46 +82,48 @@ def show_note_detail(note_id: str):
 
         st.markdown("---")
 
-        # 布局：左侧内容，右侧图片
-        col_content, col_images = st.columns([2, 1])
+        # 添加 CSS 样式控制游记中的图片大小
+        st.markdown("""
+        <style>
+        /* 游记内容中的图片样式 */
+        .stMarkdown img {
+            max-width: 600px;
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 16px 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-        with col_content:
-            st.markdown("## 📝 游记内容")
+        # 游记内容（全宽显示，照片嵌入在内容中）
+        st.markdown("## 📝 游记内容")
 
-            # AI 生成的游记内容
-            ai_content = note.get("ai_content", "")
-            if ai_content:
-                st.markdown(ai_content)
-            else:
-                st.info("暂无游记内容")
+        # AI 生成的游记内容
+        ai_content = note.get("ai_content", "")
+        if ai_content:
+            st.markdown(ai_content)
+        else:
+            st.info("暂无游记内容")
 
-            # 用户备注
-            user_notes = note.get("user_notes", "")
-            if user_notes:
-                st.markdown("---")
-                st.markdown("### 💭 我的感想")
-                st.markdown(user_notes)
+        # 用户备注
+        user_notes = note.get("user_notes", "")
+        if user_notes:
+            st.markdown("---")
+            st.markdown("### 💭 我的感想")
+            st.markdown(user_notes)
 
-            # OCR 识别结果
-            ocr_results = note.get("ocr_results", {})
-            if ocr_results:
-                st.markdown("---")
-                st.markdown("### 🔍 OCR 识别内容")
+        # OCR 识别结果
+        ocr_results = note.get("ocr_results", {})
+        if ocr_results:
+            st.markdown("---")
+            st.markdown("### 🔍 OCR 识别内容")
 
-                for photo_name, ocr_text in ocr_results.items():
-                    if ocr_text:
-                        with st.expander(f"📷 {photo_name}"):
-                            st.markdown(ocr_text)
-
-        with col_images:
-            st.markdown("## 📸 照片集")
-
-            images = note.get("images", [])
-            if images:
-                for i, img_url in enumerate(images):
-                    st.image(img_url, use_column_width=True, caption=f"照片 {i + 1}")
-            else:
-                st.info("暂无照片")
+            for photo_name, ocr_text in ocr_results.items():
+                if ocr_text:
+                    with st.expander(f"📷 {photo_name}"):
+                        st.markdown(ocr_text)
 
         st.markdown("---")
 
