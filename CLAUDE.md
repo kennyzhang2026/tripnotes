@@ -253,8 +253,9 @@ feature/v2.0-video       # 视频功能
 - ✅ 修复 `use_column_width` 废弃警告
 - ✅ 修复空 label 警告
 
-#### Bug 修复（v0.3.0-stage6-fix1）
+#### Bug 修复（v0.3.0-stage6-fix1/fix2）
 - ✅ 修复我的游记页面排序错误（None 值比较问题）
+- ✅ 修复编辑游记页面语法错误（中文引号问题）
 
 ---
 
