@@ -23,6 +23,8 @@ class OCRClient:
         self.access_key_secret = config.get_aliyun_access_key_secret()
         self.endpoint = config.get_aliyun_ocr_endpoint()
 
+        print(f"[DEBUG OCR] Endpoint: {self.endpoint}")
+
         self.client = self._create_client()
 
     def _create_client(self) -> OcrClient:

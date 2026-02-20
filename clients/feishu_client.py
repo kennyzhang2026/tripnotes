@@ -7,6 +7,7 @@
 
 import json
 import time
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 import requests
 from utils.config import get_config
@@ -97,7 +98,13 @@ class FeishuClient:
         result = response.json()
 
         if result.get("code") != 0:
-            raise Exception(f"飞书 API 请求失败: {result.get('msg')}")
+            error_msg = result.get('msg', '未知错误')
+            print(f"[DEBUG] 飞书 API 错误详情:")
+            print(f"  代码: {result.get('code')}")
+            print(f"  消息: {error_msg}")
+            if data:
+                print(f"  请求数据: {json.dumps(data, ensure_ascii=False, indent=2)[:500]}")
+            raise Exception(f"飞书 API 请求失败: {error_msg}")
 
         return result.get("data", {})
 
@@ -141,16 +148,24 @@ class FeishuClient:
         """
         url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{self.app_token_user}/tables/{self.table_id_user}/records"
 
+        print(f"[DEBUG] 飞书查询 - AppToken: {self.app_token_user}, TableID: {self.table_id_user}")
+
         # 获取所有记录，然后在代码中过滤
         result = self._request("GET", url, params={"page_size": 100})
         items = result.get("items", [])
 
+        print(f"[DEBUG] 飞书返回记录数: {len(items)}")
+
         # 在代码中查找匹配的用户名
         for item in items:
             fields = item.get("fields", {})
-            if fields.get("username") == username:
+            item_username = fields.get("username", "")
+            print(f"[DEBUG] 检查记录 - username字段: '{item_username}', 查找: '{username}'")
+            if item_username == username:
+                print(f"[DEBUG] 找到匹配用户: {fields}")
                 return item
 
+        print(f"[DEBUG] 未找到用户: {username}")
         return None
 
     def update_user_status(self, record_id: str, status: str) -> dict:
@@ -170,6 +185,23 @@ class FeishuClient:
 
         return self._request("PATCH", url, data=data)
 
+    def update_user_password(self, record_id: str, password: str) -> dict:
+        """
+        更新用户密码
+
+        Args:
+            record_id: 记录 ID
+            password: 新密码（明文）
+
+        Returns:
+            更新后的记录
+        """
+        url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{self.app_token_user}/tables/{self.table_id_user}/records/{record_id}"
+
+        data = {"fields": {"password": password}}
+
+        return self._request("PATCH", url, data=data)
+
     # ===== 游记数据操作 =====
 
     def create_trip_note(self, note_data: dict) -> dict:
@@ -185,19 +217,39 @@ class FeishuClient:
         url = f"https://open.feishu.cn/open-apis/bitable/v1/apps/{self.app_token_note}/tables/{self.table_id_note}/records"
 
         # 转换数据格式
+        # 注意：travel_date 需要转换为飞书支持的日期格式（整数时间戳毫秒）
+        travel_date = note_data.get("travel_date", "")
+        # 将日期字符串转换为时间戳（毫秒）
+        if isinstance(travel_date, str) and travel_date:
+            from datetime import datetime
+            try:
+                dt = datetime.strptime(travel_date, "%Y-%m-%d")
+                travel_date = int(dt.timestamp() * 1000)
+            except:
+                travel_date = int(time.time() * 1000)
+        elif not travel_date:
+            travel_date = int(time.time() * 1000)
+
         fields = {
             "note_id": note_data.get("note_id"),
             "username": note_data.get("username"),
             "title": note_data.get("title", ""),
             "location": note_data.get("location", ""),
-            "travel_date": note_data.get("travel_date", ""),
+            "travel_date": travel_date,
             "images": json.dumps(note_data.get("images", []), ensure_ascii=False),
             "ocr_results": json.dumps(note_data.get("ocr_results", {}), ensure_ascii=False),
             "user_notes": note_data.get("user_notes", ""),
-            "ai_content": note_data.get("ai_content", ""),
-            "created_at": int(time.time() * 1000),
-            "updated_at": int(time.time() * 1000)
+            "ai_content": note_data.get("ai_content", "")
+            # 注意：created_at 和 updated_at 是飞书自动管理的字段，不能手动设置
         }
+
+        # 调试日志
+        print(f"[DEBUG] 准备创建游记，字段数据:")
+        for key, value in fields.items():
+            if key == "ai_content":
+                print(f"  {key}: {value[:50]}..." if len(value) > 50 else f"  {key}: {value}")
+            else:
+                print(f"  {key}: {value}")
 
         data = {"fields": fields}
 

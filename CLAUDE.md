@@ -1,8 +1,8 @@
 # 游记助手 (Trip Note) 项目文档
 
-> 版本: v0.2.0
-> 更新时间: 2026-02-19
-> 状态: 调试中 - 认证功能测试
+> 版本: v0.2.1
+> 更新时间: 2026-02-20
+> 状态: 稳定版本 - 核心功能已完成
 
 ---
 
@@ -22,9 +22,9 @@
 | 组件 | 技术方案 | 说明 |
 |------|---------|------|
 | 前端框架 | Streamlit | 支持多端访问 |
-| AI模型 | DeepSeek API | 游记生成、OCR文字解释 |
-| OCR服务 | 阿里云OCR | 500次/月免费 |
-| 图片存储 | 阿里云OSS | 5GB+5GB流量/月免费 |
+| AI模型 | DeepSeek API | 游记生成、标题生成 |
+| OCR服务 | 阿里云OCR | 500次/月免费（通用文字识别） |
+| 图片存储 | 阿里云OSS | 华北2（北京）5GB+5GB流量/月免费 |
 | 语音识别 | 阿里云ASR | 高精度语音转文字 |
 | 数据存储 | 飞书多维表格 | 用户数据、游记数据 |
 | 部署平台 | Streamlit Cloud | 免费部署 |
@@ -77,7 +77,7 @@ trip_note/
 | 字段名 | 类型 | 说明 |
 |--------|------|------|
 | username | text | 用户名(唯一) |
-| password | text | 密码 |
+| password | text | 密码（明文存储） |
 | status | text | 状态(pending/active) |
 | role | text | 用户角色(user/admin) |
 
@@ -88,13 +88,11 @@ trip_note/
 | username | text | 关联用户名 |
 | title | text | 游记标题 |
 | location | text | 地点/景区 |
-| travel_date | date | 旅行日期 |
+| travel_date | date | 旅行日期（毫秒时间戳） |
 | images | text | 图片URL数组(JSON) |
 | ocr_results | text | OCR识别结果(JSON) |
 | user_notes | text | 用户感想/评论 |
 | ai_content | longtext | AI生成的游记内容 |
-| created_at | datetime | 创建时间 |
-| updated_at | datetime | 更新时间 |
 
 ---
 
@@ -119,9 +117,8 @@ trip_note/
 
 ### 关键交互点
 1. **"+"按钮**：展开新的照片+评论输入区
-2. **语音按钮**：长按录音，松开后转换文字
-3. **草稿保存**：可以保存草稿，下次继续
-4. **快速进入**：首页大按钮直接进入拍照界面
+2. **语音按钮**：上传音频文件转换文字
+3. **快速进入**：首页大按钮直接进入创建游记
 
 ---
 
@@ -139,9 +136,9 @@ ALIYUN_ACCESS_KEY_SECRET = "xxx"
 # 阿里云OCR
 ALIYUN_OCR_ENDPOINT = "https://ocr-api.cn-hangzhou.aliyuncs.com"
 
-# 阿里云OSS
-ALIYUN_OSS_BUCKET_NAME = "trip-note"
-ALIYUN_OSS_ENDPOINT = "oss-cn-hangzhou.aliyuncs.com"
+# 阿里云OSS - 华北2（北京）
+ALIYUN_OSS_BUCKET_NAME = "tripnote"
+ALIYUN_OSS_ENDPOINT = "oss-cn-beijing.aliyuncs.com"
 
 # 阿里云ASR
 ALIYUN_ASR_ENDPOINT = "https://nls-meta.cn-shanghai.aliyuncs.com"
@@ -178,7 +175,7 @@ pydantic>=2.0.0
 master          # 稳定版本
 
 # 功能分支
-feature/v1.0-init        # 项目初始化 (当前)
+feature/v1.0-init        # 项目初始化
 feature/v1.0-clients     # 核心客户端开发
 feature/v1.0-ai          # AI集成
 feature/v1.0-ui          # UI开发
@@ -194,19 +191,25 @@ feature/v2.0-video       # 视频功能
 
 ## 版本历史
 
-### 当前调试进度 (2026-02-19)
+### v0.2.1 (2026-02-20) - Git Tag: `v0.2.1` ✅ 稳定版本
 
-#### 正在处理的问题
-- 🔧 用户登录调试中
-  - 问题：登录返回"用户名或密码错误"
-  - 已添加调试日志到 `auth_client.py` 和 `feishu_client.py`
-  - 需要确认飞书表格配置（AppToken、TableID）
-  - 需要确认用户数据（用户名 `kenny`，密码明文存储，状态为 `active`）
+#### 核心功能修复
+- ✅ 修复 OSS endpoint 配置（华北2北京）
+- ✅ 修复飞书保存字段类型问题（移除自动字段，修复日期格式）
+- ✅ 修复照片添加 entry_id 问题
+- ✅ 修复 use_column_width 废弃警告
 
-#### 最近修改
-- 🔧 简化认证流程 - 移除密码哈希，改用明文密码
-- 🔧 修复飞书 API filter - 改用客户端过滤
-- 🔧 移除登录/注册页面的无效 HTML 链接
+#### 已验证功能
+- ✅ 用户登录/注册
+- ✅ 照片上传到 OSS
+- ✅ AI 生成游记
+- ✅ 保存到飞书多维表格
+
+#### 待测试功能
+- ⏳ OCR 识别功能
+- ⏳ 语音转文字功能
+- ⏳ 游记列表/详情/编辑
+- ⏳ 游记导出
 
 ---
 
@@ -242,7 +245,7 @@ feature/v2.0-video       # 视频功能
 - ✅ 飞书多维表格配置
 
 #### 核心客户端开发
-- ✅ AI 客户端（DeepSeek API）- 游记生成、标题生成、文化解释
+- ✅ AI 客户端（DeepSeek API）- 游记生成、标题生成
 - ✅ OCR 客户端（阿里云）- 通用文字识别、表格识别
 - ✅ OSS 客户端（阿里云）- 图片上传、删除、批量操作
 - ✅ ASR 客户端（阿里云）- 语音转文字
@@ -253,7 +256,7 @@ feature/v2.0-video       # 视频功能
 #### 工具模块开发
 - ✅ config.py - 配置管理（Streamlit secrets 集成）
 - ✅ prompts.py - AI 提示词模板
-- ✅ auth.py - 认证工具（密码哈希、会话管理）
+- ✅ auth.py - 认证工具
 - ✅ image_utils.py - 图片处理（压缩、验证、格式转换）
 
 #### UI 页面开发
@@ -276,11 +279,6 @@ feature/v2.0-video       # 视频功能
 - ✅ README.md（项目说明）
 - ✅ CLAUDE.md（项目文档）
 
-#### 配置问题修复
-- ✅ 阿里云 OCR InvalidVersion 错误修复
-- ✅ 飞书权限配置优化（仅需 bitable:app）
-- ✅ secrets.toml 格式修正（移除 Markdown 链接格式）
-
 ---
 
 ## 当前状态
@@ -289,67 +287,26 @@ feature/v2.0-video       # 视频功能
 |------|------|------|
 | 配置管理 | ✅ 完成 | 所有服务密钥已配置 |
 | AI 客户端 | ✅ 完成 | DeepSeek API 集成 |
-| OCR 客户端 | ✅ 完成 | 阿里云 OCR 集成 |
-| OSS 客户端 | ✅ 完成 | 阿里云 OSS 图片存储 |
+| OCR 客户端 | ✅ 完成 | 阿里云 OCR 集成（通用文字识别） |
+| OSS 客户端 | ✅ 完成 | 阿里云 OSS（华北2北京） |
 | ASR 客户端 | ✅ 完成 | 阿里云语音识别 |
-| 飞书客户端 | 🔧 调试 | API filter 格式已修复 |
-| 认证系统 | 🔧 调试 | 已添加调试日志，测试中 |
+| 飞书客户端 | ✅ 完成 | 多维表格操作 |
+| 认证系统 | ✅ 完成 | 登录/注册功能 |
 | 工具模块 | ✅ 完成 | 配置、提示词、图片处理 |
 | UI 页面 | ✅ 完成 | 全部 6 个页面完成 |
-| 游记管理 | ✅ 完成 | 列表、详情、编辑、导出 |
-
-### 调试信息
-
-#### 飞书表格配置确认
-请确认以下配置在 `.streamlit/secrets.toml` 中正确设置：
-
-```toml
-# 飞书配置
-FEISHU_APP_ID = "cli_xxx"
-FEISHU_APP_SECRET = "xxx"
-
-# 用户数据表 (trip_note_users)
-FEISHU_APP_TOKEN_USER = "bascnxxxxx"  # 从表格 URL 获取
-FEISHU_TABLE_ID_USER = "tblxxxxx"    # 从表格 URL 获取
-
-# 游记数据表 (trip_notes)
-FEISHU_APP_TOKEN_NOTE = "bascnxxxxx"  # 从表格 URL 获取
-FEISHU_TABLE_ID_NOTE = "tblxxxxx"    # 从表格 URL 获取
-```
-
-#### 用户数据确认
-飞书表格 `trip_note_users` 中应包含：
-- `username`: kenny
-- `password`: 你的密码（明文）
-- `status`: active
-- `role`: user 或 admin
-
-#### 调试检查清单
-1. ☑ 确认飞书表格 `trip_note_users` 存在且有数据
-2. ☑ 确认用户 `kenny` 的 `status` 字段为 `active`
-3. ☑ 确认 `secrets.toml` 中的 AppToken 和 TableID 正确
-4. ☑ 运行应用后在终端查看调试日志
-5. ☑ 根据调试日志判断问题所在
-
-#### 调试日志查看位置
-运行 `streamlit run app.py` 后，调试信息会直接显示在终端中：
-```
-[DEBUG] 尝试登录 - 用户名: kenny
-[DEBUG] 飞书查询 - AppToken: xxx, TableID: xxx
-[DEBUG] 飞书返回记录数: X
-[DEBUG] 检查记录 - username字段: 'xxx', 查找: 'kenny'
-...
-```
+| 游记创建 | ✅ 完成 | 上传、生成、保存核心流程 |
+| 游记管理 | ⏳ 待测 | 列表、详情、编辑、导出 |
 
 ---
 
 ## 下一步计划
 
-### 测试和部署（feature/v1.0-test）
-1. 单元测试编写
-2. 集成测试
-3. Streamlit Cloud 部署
-4. 生产环境配置
+### v0.2.2 - 功能完善
+1. 测试 OCR 识别功能
+2. 测试语音转文字功能
+3. 测试游记列表/详情/编辑
+4. 测试游记导出
+5. 创建 v0.2.2 稳定标签
 
 ### 功能增强（v2.0）
 1. 草稿保存功能

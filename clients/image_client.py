@@ -22,8 +22,14 @@ class ImageClient:
         self.bucket_name = config.get_aliyun_oss_bucket_name()
         self.endpoint = config.get_aliyun_oss_endpoint()
 
+        # 调试日志
+        print(f"[DEBUG OSS] Bucket: {self.bucket_name}, Endpoint: {self.endpoint}")
+        print(f"[DEBUG OSS] 完整 endpoint URL: https://{self.endpoint}")
+
         auth = oss2.Auth(self.access_key_id, self.access_key_secret)
-        self.bucket = oss2.Bucket(auth, f"https://{self.endpoint}", self.bucket_name)
+        # OSS endpoint 不包含 https://，SDK 会自动处理
+        self.bucket = oss2.Bucket(auth, self.endpoint, self.bucket_name)
+        print(f"[DEBUG OSS] Bucket 对象创建完成: {self.bucket.endpoint}")
 
     def generate_key(self, username: str, note_id: str, filename: str) -> str:
         """

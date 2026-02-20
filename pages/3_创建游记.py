@@ -67,7 +67,7 @@ def show_create_note_page():
 
                 with col_img:
                     if entry.get("image"):
-                        st.image(entry["image"], use_column_width=True)
+                        st.image(entry["image"], width=400)
 
                 with col_info:
                     st.markdown(f"**用户备注**: {entry.get('note', '无')}")
@@ -84,8 +84,10 @@ def show_create_note_page():
     st.markdown("---")
     st.markdown("### ➕ 添加新照片")
 
-    entry_id = str(uuid.uuid4())
-    st.session_state.current_entry_id = entry_id
+    # 只在第一次或需要新的 entry_id 时生成
+    if st.session_state.current_entry_id is None:
+        st.session_state.current_entry_id = str(uuid.uuid4())
+    entry_id = st.session_state.current_entry_id
 
     # 创建两列布局
     col_upload, col_note = st.columns([1, 1])
@@ -101,7 +103,7 @@ def show_create_note_page():
         if uploaded_file:
             image = validate_image(uploaded_file)
             if image:
-                st.image(image, use_column_width=True)
+                st.image(image, width=400)
                 st.session_state[f"temp_image_{entry_id}"] = image
 
                 # OCR 识别按钮
@@ -172,6 +174,9 @@ def show_create_note_page():
             for key in list(st.session_state.keys()):
                 if key.startswith(f"temp_{entry_id}"):
                     del st.session_state[key]
+
+            # 重置 entry_id，以便下次添加新照片
+            st.session_state.current_entry_id = None
 
             st.success("已添加！继续添加或点击生成游记")
             st.rerun()
@@ -294,7 +299,7 @@ def generate_trip_note(username: str, location: str, travel_date: str, auto_titl
                     st.markdown("---")
                     st.markdown("### 📷 照片集")
                     for url in image_urls:
-                        st.image(url, use_column_width=True)
+                        st.image(url, width=600)
 
                 # 清空临时数据
                 st.session_state.photo_entries = []

@@ -45,11 +45,10 @@ class AuthClient:
         if existing_user:
             return False, "用户名已被注册"
 
-        # 创建用户
+        # 创建用户 - 直接存储明文密码，状态为 pending 等待管理员激活
         try:
-            hashed_password = hash_password(password)
-            self.feishu.create_user(username, hashed_password, status="active")
-            return True, "注册成功"
+            self.feishu.create_user(username, password, status="pending")
+            return True, "注册成功，请等待管理员激活账号"
         except Exception as e:
             return False, f"注册失败: {str(e)}"
 
@@ -64,21 +63,38 @@ class AuthClient:
         Returns:
             (是否成功, 消息)
         """
+        # DEBUG: 输出登录信息
+        print(f"[DEBUG] 尝试登录 - 用户名: {username}")
+
         # 检查用户是否存在
         user = self.feishu.get_user(username)
+        print(f"[DEBUG] 获取用户结果: {user}")
+
         if not user:
+            print(f"[DEBUG] 用户不存在")
             return False, "用户名或密码错误"
 
-        # 验证密码
-        stored_password = user.get("fields", {}).get("password", "")
-        if not verify_password(password, stored_password):
+        # 验证密码 - 直接明文比较
+        fields = user.get("fields", {})
+        print(f"[DEBUG] 用户字段: {fields}")
+
+        stored_password = fields.get("password", "")
+        print(f"[DEBUG] 存储的密码: '{stored_password}', 输入密码: '{password}'")
+
+        # 直接比较明文密码
+        if password != stored_password:
+            print(f"[DEBUG] 密码不匹配")
             return False, "用户名或密码错误"
 
         # 检查账号状态
-        status = user.get("fields", {}).get("status", "")
+        status = fields.get("status", "")
+        print(f"[DEBUG] 账号状态: {status}")
+
         if status != "active":
+            print(f"[DEBUG] 账号状态异常")
             return False, f"账号状态异常: {status}"
 
+        print(f"[DEBUG] 登录成功")
         return True, "登录成功"
 
     def get_user_info(self, username: str) -> dict:
@@ -132,8 +148,8 @@ class AuthClient:
             user = self.feishu.get_user(username)
             record_id = user.get("record_id", "")
 
-            hashed_password = hash_password(new_password)
-            self.feishu.update_user_status(record_id, f"password_{hashed_password}")
+            # 使用专门的密码更新方法
+            self.feishu.update_user_password(record_id, new_password)
             return True, "密码修改成功"
         except Exception as e:
             return False, f"修改密码失败: {str(e)}"
