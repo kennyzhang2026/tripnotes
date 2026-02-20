@@ -78,7 +78,6 @@ def show_create_note_page():
 
     # ==================== v0.3.0 批次输入区域 ====================
     st.markdown("---")
-    st.markdown("### 📸 批次内容")
 
     # 创建两列布局：左侧照片，右侧评论
     col_photos, col_comment = st.columns([1, 1])
@@ -165,8 +164,6 @@ def show_create_note_page():
                                 removed = st.session_state.current_batch_photos.pop(idx)
                                 print(f"[DEBUG] 删除照片: {removed['filename']}")
                                 st.rerun()
-        else:
-            st.info("👆 请选择或拍照添加照片")
 
     with col_comment:
         st.markdown("#### 📝 我的感想")
