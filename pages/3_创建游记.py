@@ -86,32 +86,48 @@ def show_create_note_page():
     with col_photos:
         st.markdown("#### 📷 照片区域")
 
-        # 批量上传照片（在移动端会显示相机选项）
-        uploaded_files = st.file_uploader(
-            "➕ 添加照片",
-            type=["jpg", "jpeg", "png"],
-            accept_multiple_files=True,
-            key="batch_photo_upload",
-            help="支持多选照片，移动端可拍照",
-            label_visibility="visible"
-        )
+        # 照片添加选项卡
+        photo_tab1, photo_tab2 = st.tabs(["📁 选择照片", "📷 拍照"])
 
-        # 处理新上传的照片
-        if uploaded_files:
-            for uploaded_file in uploaded_files:
-                # 检查是否已添加（通过文件名判断）
-                is_duplicate = any(
-                    p.get("filename") == uploaded_file.name
-                    for p in st.session_state.current_batch_photos
-                )
-                if not is_duplicate:
-                    image = validate_image(uploaded_file)
-                    if image:
-                        st.session_state.current_batch_photos.append({
-                            "image": image,
-                            "filename": uploaded_file.name
-                        })
-                        print(f"[DEBUG] 添加照片: {uploaded_file.name}")
+        with photo_tab1:
+            # 从文件选择
+            uploaded_files = st.file_uploader(
+                "选择照片（支持多选）",
+                type=["jpg", "jpeg", "png"],
+                accept_multiple_files=True,
+                key="batch_photo_upload_files",
+                label_visibility="visible"
+            )
+
+            if uploaded_files:
+                for uploaded_file in uploaded_files:
+                    is_duplicate = any(
+                        p.get("filename") == uploaded_file.name
+                        for p in st.session_state.current_batch_photos
+                    )
+                    if not is_duplicate:
+                        image = validate_image(uploaded_file)
+                        if image:
+                            st.session_state.current_batch_photos.append({
+                                "image": image,
+                                "filename": uploaded_file.name
+                            })
+                            print(f"[DEBUG] 添加照片: {uploaded_file.name}")
+                st.rerun()
+
+        with photo_tab2:
+            # 拍照
+            camera_image = st.camera_input("拍照上传", key="batch_photo_camera")
+            if camera_image:
+                image = validate_image(camera_image)
+                if image:
+                    filename = f"camera_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                    st.session_state.current_batch_photos.append({
+                        "image": image,
+                        "filename": filename
+                    })
+                    print(f"[DEBUG] 添加拍照: {filename}")
+                    st.rerun()
 
         # 显示已添加的照片网格
         if st.session_state.current_batch_photos:
@@ -127,64 +143,64 @@ def show_create_note_page():
                         with col:
                             st.image(photo["image"], width="content")
                             # 删除按钮
-                            if st.button("🗑️ 删除", key=f"del_photo_{idx}"):
+                            if st.button("🗑️", key=f"del_photo_{idx}"):
                                 removed = st.session_state.current_batch_photos.pop(idx)
                                 print(f"[DEBUG] 删除照片: {removed['filename']}")
                                 st.rerun()
         else:
-            st.info("👆 点击上方添加照片")
+            st.info("👆 请选择或拍照添加照片")
 
     with col_comment:
         st.markdown("#### 📝 我的感想")
 
-        # 评论输入区域（整合时间、地点提示）
+        # 语音上传（隐藏在上方）
+        audio_file = st.file_uploader(
+            "语音输入",
+            type=["wav", "mp3", "m4a"],
+            key="batch_audio_upload",
+            label_visibility="collapsed",
+            help="上传音频转换为文字"
+        )
+
+        # 评论输入区域
         comment = st.text_area(
             "在这里记录你的旅行感受...",
             placeholder="""提示：可以包含以下信息
 • 时间：今天下午、傍晚时分...
 • 地点：西湖边、断桥上、雷峰塔下...
 • 人物：和家人、和朋友...
-• 感受：风景很美、心情愉快...""",
+• 感受：风景很美、心情愉快...
+
+🎤 语音: 上传音频后会显示转换按钮 →""",
             key="batch_comment",
-            height=250,
+            height=280,
             label_visibility="collapsed"
         )
         st.session_state.current_batch_comment = comment
 
-        # 语音按钮（简洁版）
-        st.markdown("---")
-        audio_file = st.file_uploader(
-            "🎤 语音转文字",
-            type=["wav", "mp3", "m4a"],
-            key="batch_audio_upload",
-            help="上传音频文件自动转换为文字"
-        )
-
+        # 语音转换按钮（当有音频时显示）
         if audio_file:
-            col_play, col_convert = st.columns([1, 1])
-            with col_play:
-                st.audio(audio_file)
-            with col_convert:
-                if st.button("🎵 转换", key="batch_transcribe", use_container_width=True):
-                    with st.spinner("正在转换..."):
-                        try:
-                            asr_client = ASRClient()
-                            audio_bytes = audio_file.read()
-                            text = asr_client.transcribe_bytes(audio_bytes, format="wav")
+            if st.button("🎵 转换语音为文字", key="batch_transcribe", use_container_width=True):
+                with st.spinner("正在转换..."):
+                    try:
+                        asr_client = ASRClient()
+                        audio_bytes = audio_file.read()
+                        text = asr_client.transcribe_bytes(audio_bytes, format="wav")
 
-                            if text:
-                                st.success(f"✅ 转换成功")
-                                # 将语音转文字追加到输入框
-                                current = st.session_state.current_batch_comment
-                                new_comment = current + (" " if current else "") + text
-                                st.session_state.current_batch_comment = new_comment
-                                st.session_state.batch_comment = new_comment
-                                st.rerun()
-                            else:
-                                st.warning("未能识别到语音")
-                        except Exception as e:
-                            st.error(f"语音转换失败: {str(e)}")
-                            print(f"[DEBUG] 语音转换错误: {e}")
+                        if text:
+                            st.success(f"✅ 转换成功")
+                            current = st.session_state.current_batch_comment
+                            new_comment = current + (" " if current else "") + text
+                            st.session_state.current_batch_comment = new_comment
+                            st.session_state.batch_comment = new_comment
+                            # 清空音频
+                            st.session_state.batch_audio_upload = None
+                            st.rerun()
+                        else:
+                            st.warning("未能识别到语音")
+                    except Exception as e:
+                        st.error(f"语音转换失败: {str(e)}")
+                        print(f"[DEBUG] 语音转换错误: {e}")
 
     # 提交这批内容按钮
     st.markdown("---")
