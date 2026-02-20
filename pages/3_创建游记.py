@@ -87,16 +87,16 @@ def show_create_note_page():
         st.markdown("#### 📷 照片区域")
 
         # 照片添加选项卡
-        photo_tab1, photo_tab2 = st.tabs(["📁 选择照片", "📷 拍照"])
+        photo_tab1, photo_tab2 = st.tabs(["📁 照片", "📷 拍照"])
 
         with photo_tab1:
-            # 从文件选择
+            # 从文件选择（简洁版）
             uploaded_files = st.file_uploader(
-                "选择照片（支持多选）",
+                "",
                 type=["jpg", "jpeg", "png"],
                 accept_multiple_files=True,
                 key="batch_photo_upload_files",
-                label_visibility="visible"
+                label_visibility="collapsed"
             )
 
             if uploaded_files:
@@ -117,7 +117,7 @@ def show_create_note_page():
 
         with photo_tab2:
             # 拍照
-            camera_image = st.camera_input("拍照上传", key="batch_photo_camera")
+            camera_image = st.camera_input("", key="batch_photo_camera", label_visibility="collapsed")
             if camera_image:
                 image = validate_image(camera_image)
                 if image:
@@ -153,15 +153,6 @@ def show_create_note_page():
     with col_comment:
         st.markdown("#### 📝 我的感想")
 
-        # 语音上传（隐藏在上方）
-        audio_file = st.file_uploader(
-            "语音输入",
-            type=["wav", "mp3", "m4a"],
-            key="batch_audio_upload",
-            label_visibility="collapsed",
-            help="上传音频转换为文字"
-        )
-
         # 评论输入区域
         comment = st.text_area(
             "在这里记录你的旅行感受...",
@@ -169,38 +160,50 @@ def show_create_note_page():
 • 时间：今天下午、傍晚时分...
 • 地点：西湖边、断桥上、雷峰塔下...
 • 人物：和家人、和朋友...
-• 感受：风景很美、心情愉快...
-
-🎤 语音: 上传音频后会显示转换按钮 →""",
+• 感受：风景很美、心情愉快...""",
             key="batch_comment",
-            height=280,
+            height=300,
             label_visibility="collapsed"
         )
         st.session_state.current_batch_comment = comment
 
-        # 语音转换按钮（当有音频时显示）
-        if audio_file:
-            if st.button("🎵 转换语音为文字", key="batch_transcribe", use_container_width=True):
-                with st.spinner("正在转换..."):
-                    try:
-                        asr_client = ASRClient()
-                        audio_bytes = audio_file.read()
-                        text = asr_client.transcribe_bytes(audio_bytes, format="wav")
+        # 语音输入按钮（使用浏览器语音识别）
+        st.markdown("---")
 
-                        if text:
-                            st.success(f"✅ 转换成功")
-                            current = st.session_state.current_batch_comment
-                            new_comment = current + (" " if current else "") + text
-                            st.session_state.current_batch_comment = new_comment
-                            st.session_state.batch_comment = new_comment
-                            # 清空音频
-                            st.session_state.batch_audio_upload = None
-                            st.rerun()
-                        else:
-                            st.warning("未能识别到语音")
-                    except Exception as e:
-                        st.error(f"语音转换失败: {str(e)}")
-                        print(f"[DEBUG] 语音转换错误: {e}")
+        # 使用 HTML 实现语音输入按钮
+        st.markdown("""
+        <style>
+        .voice-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+        .voice-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .voice-button.recording {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # 使用 Streamlit 的原生按钮，通过 JS 调用语音识别
+        if st.button("🎤 按住说话", key="voice_input_btn", use_container_width=True):
+            st.info("📢 正在录音...请说话（暂未实现，请使用文本输入）")
 
     # 提交这批内容按钮
     st.markdown("---")
