@@ -27,15 +27,15 @@ st.set_page_config(
 # current_batch_photos: 当前批次的照片列表
 # current_batch_comment: 当前批次的评论
 # submitted_batches: 已提交的批次列表
+# _processed_files: 已处理的文件集合（防止重复处理）
 if "current_batch_photos" not in st.session_state:
     st.session_state.current_batch_photos = []
 if "current_batch_comment" not in st.session_state:
     st.session_state.current_batch_comment = ""
 if "submitted_batches" not in st.session_state:
     st.session_state.submitted_batches = []
-
-# DEBUG: 打印初始状态
-print(f"[DEBUG] 初始化 session_state - batches: {len(st.session_state.submitted_batches)}")
+if "_processed_files" not in st.session_state:
+    st.session_state._processed_files = set()
 
 
 def require_auth():
@@ -117,34 +117,51 @@ def show_create_note_page():
             )
 
             if uploaded_files:
+                # 处理新上传的文件（使用文件名+位置作为唯一标识）
+                new_files_added = False
                 for uploaded_file in uploaded_files:
-                    is_duplicate = any(
-                        p.get("filename") == uploaded_file.name
-                        for p in st.session_state.current_batch_photos
-                    )
-                    if not is_duplicate:
-                        image = validate_image(uploaded_file)
-                        if image:
-                            st.session_state.current_batch_photos.append({
-                                "image": image,
-                                "filename": uploaded_file.name
-                            })
-                            print(f"[DEBUG] 添加照片: {uploaded_file.name}")
-                st.rerun()
+                    # 创建唯一标识：文件名 + 文件大小
+                    file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+
+                    # 检查是否已处理过此文件
+                    if file_id not in st.session_state._processed_files:
+                        is_duplicate = any(
+                            p.get("filename") == uploaded_file.name
+                            for p in st.session_state.current_batch_photos
+                        )
+                        if not is_duplicate:
+                            image = validate_image(uploaded_file)
+                            if image:
+                                st.session_state.current_batch_photos.append({
+                                    "image": image,
+                                    "filename": uploaded_file.name
+                                })
+                                print(f"[DEBUG] 添加照片: {uploaded_file.name}")
+                                st.session_state._processed_files.add(file_id)
+                                new_files_added = True
+
+                # 只有在添加了新文件时才 rerun
+                if new_files_added:
+                    st.rerun()
 
         with photo_tab2:
             # 拍照
             camera_image = st.camera_input("", key="batch_photo_camera", label_visibility="collapsed")
             if camera_image:
-                image = validate_image(camera_image)
-                if image:
-                    filename = f"camera_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-                    st.session_state.current_batch_photos.append({
-                        "image": image,
-                        "filename": filename
-                    })
-                    print(f"[DEBUG] 添加拍照: {filename}")
-                    st.rerun()
+                # 使用时间戳+文件大小作为唯一标识
+                file_id = f"camera_{camera_image.name}_{camera_image.size}"
+
+                if file_id not in st.session_state._processed_files:
+                    image = validate_image(camera_image)
+                    if image:
+                        filename = f"camera_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                        st.session_state.current_batch_photos.append({
+                            "image": image,
+                            "filename": filename
+                        })
+                        print(f"[DEBUG] 添加拍照: {filename}")
+                        st.session_state._processed_files.add(file_id)
+                        st.rerun()
 
         # 显示已添加的照片网格
         if st.session_state.current_batch_photos:
@@ -192,16 +209,20 @@ def show_create_note_page():
         # 提交批次
         with st.spinner("正在提交批次..."):
             try:
+                print(f"[DEBUG] 开始提交批次，照片数量: {len(st.session_state.current_batch_photos)}")
+
                 # 上传照片到 OSS
                 image_client = ImageClient()
                 batch_id = str(uuid.uuid4())
                 image_urls = []
 
                 for i, photo in enumerate(st.session_state.current_batch_photos):
+                    print(f"[DEBUG] 上传照片 {i+1}/{len(st.session_state.current_batch_photos)}")
                     img_bytes = compress_image(photo["image"])
                     filename = f"batch_{batch_id}_photo_{i+1}.jpg"
                     url = image_client.upload_image(img_bytes, username, batch_id, filename)
                     image_urls.append(url)
+                    print(f"[DEBUG] 照片上传成功: {url}")
 
                 # 创建批次记录
                 batch = {
@@ -217,7 +238,6 @@ def show_create_note_page():
                 # 清空当前批次
                 st.session_state.current_batch_photos = []
                 st.session_state.current_batch_comment = ""
-                st.session_state.batch_comment = ""
 
                 st.success(f"✅ 已提交批次 {len(st.session_state.submitted_batches)}！继续添加或生成游记")
                 st.rerun()
@@ -225,6 +245,8 @@ def show_create_note_page():
             except Exception as e:
                 st.error(f"提交失败: {str(e)}")
                 print(f"[DEBUG] 提交批次错误: {e}")
+                import traceback
+                traceback.print_exc()
 
     # 生成游记按钮
     st.markdown("---")
