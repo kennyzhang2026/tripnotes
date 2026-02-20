@@ -230,7 +230,7 @@ def show_edit_page():
                     # 更新编辑区
                     edit_ai_content = new_content
                     st.session_state.edit_ai_content = new_content
-                    st.success("游记内容已更新！请切换到"编辑内容"标签查看")
+                    st.success("游记内容已更新！请切换到'编辑内容'标签查看")
 
                 except Exception as e:
                     st.error(f"生成失败: {str(e)}")
